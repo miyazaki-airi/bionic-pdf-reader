@@ -1,0 +1,15 @@
+{
+  "name": "bionic-pdf-reader",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && node index.js",
+    "dev:client": "cd client && npx vite --port 3000",
+    "build": "cd client && npx vite build",
+    "start": "cd server && NODE_ENV=production node index.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -2,12 +2,12 @@ import React, { useState, useCallback, useRef } from 'react';
 import Upload from './components/Upload.jsx';
 import Toolbar from './components/Toolbar.jsx';
 import PDFViewer from './components/PDFViewer.jsx';
-import { loadDocument, initPDFJS } from './services/pdfRenderer.js';
+import { loadDocument } from './services/pdfRenderer.js';
 import { exportPagesToPDF } from './services/pdfExport.js';
 import { applyBionicToCanvas } from './services/bionicEngine.js';
 
 export default function App() {
-  const [fileId, setFileId] = useState(null);
+  const [loaded, setLoaded] = useState(false);
   const [filename, setFilename] = useState('');
   const [pages, setPages] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -17,20 +17,19 @@ export default function App() {
   const [exportProgress, setExportProgress] = useState(null);
   const docRef = useRef(null);
 
-  const handleUpload = useCallback(async (id, name) => {
-    setFileId(id);
-    setFilename(name);
+  const handleFileReady = useCallback(async (file) => {
+    setFilename(file.name);
     try {
-      const pdfjs = await initPDFJS();
-      const doc = await loadDocument(`/api/pdf/${id}`);
+      const arrayBuffer = await file.arrayBuffer();
+      const doc = await loadDocument({ data: arrayBuffer });
       docRef.current = doc;
-      const numPages = doc.numPages;
       const loadedPages = [];
-      for (let i = 1; i <= numPages; i++) {
+      for (let i = 1; i <= doc.numPages; i++) {
         loadedPages.push(await doc.getPage(i));
       }
       setPages(loadedPages);
       setCurrentPage(1);
+      setLoaded(true);
     } catch (err) {
       alert('Failed to load PDF: ' + err.message);
     }
@@ -80,14 +79,14 @@ export default function App() {
   }, [pages, boldRatio, exporting]);
 
   const handleBack = useCallback(() => {
-    setFileId(null);
+    setLoaded(false);
     setPages([]);
     setFilename('');
     docRef.current = null;
   }, []);
 
-  if (!fileId) {
-    return <Upload onUpload={handleUpload} uploading={false} />;
+  if (!loaded) {
+    return <Upload onFileReady={handleFileReady} />;
   }
 
   return (

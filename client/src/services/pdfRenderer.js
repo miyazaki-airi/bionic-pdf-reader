@@ -10,9 +10,9 @@ export async function initPDFJS() {
   return pdfjsLib;
 }
 
-export async function loadDocument(url) {
+export async function loadDocument(source) {
   await initPDFJS();
-  const loadingTask = pdfjsLib.getDocument(url);
+  const loadingTask = pdfjsLib.getDocument(source);
   return loadingTask.promise;
 }
 

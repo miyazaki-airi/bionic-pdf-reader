@@ -1,31 +1,21 @@
 import React, { useRef, useState } from 'react';
 
-export default function Upload({ onUpload, uploading }) {
+export default function Upload({ onFileReady }) {
   const inputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const handleFile = async (file) => {
+  const handleFile = (file) => {
     if (!file || file.type !== 'application/pdf') {
       alert('Please upload a PDF file');
       return;
     }
-    const formData = new FormData();
-    formData.append('pdf', file);
-    try {
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.fileId) onUpload(data.fileId, data.filename);
-      else alert('Upload failed: ' + (data.error || 'Unknown error'));
-    } catch (err) {
-      alert('Upload failed: ' + err.message);
-    }
+    onFileReady(file);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    handleFile(file);
+    handleFile(e.dataTransfer.files[0]);
   };
 
   return (
@@ -37,8 +27,8 @@ export default function Upload({ onUpload, uploading }) {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
       >
-        <h2>{uploading ? 'Uploading...' : 'Upload PDF'}</h2>
-        <p>{uploading ? 'Please wait...' : 'Drag & drop a PDF here, or click to browse'}</p>
+        <h2>Upload PDF</h2>
+        <p>Drag & drop a PDF here, or click to browse</p>
         <input
           ref={inputRef}
           type="file"

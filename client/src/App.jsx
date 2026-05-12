@@ -45,6 +45,8 @@ export default function App() {
       const canvases = [];
       const widths = [];
       const heights = [];
+      const textContents = [];
+      const viewports = [];
 
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i];
@@ -59,6 +61,8 @@ export default function App() {
         applyBionicToCanvas(canvas, textContent, viewport, boldRatio);
 
         canvases.push(canvas);
+        textContents.push(textContent);
+        viewports.push(viewport);
 
         const baseViewport = page.getViewport({ scale: 1.0 });
         widths.push(baseViewport.width);
@@ -67,7 +71,7 @@ export default function App() {
         setExportProgress({ current: i + 1, total: pages.length });
       }
 
-      await exportPagesToPDF(canvases, widths, heights, (current, total) => {
+      await exportPagesToPDF(canvases, widths, heights, textContents, viewports, (current, total) => {
         setExportProgress({ current, total });
       });
     } catch (err) {

@@ -1,33 +1,69 @@
-import { jsPDF } from 'jspdf';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
-export async function exportPagesToPDF(canvases, pageWidths, pageHeights, onProgress) {
-  if (canvases.length === 0) return;
-
-  const firstW = pageWidths[0];
-  const firstH = pageHeights[0];
-  const ptToMM = 0.352778;
-
-  const pdf = new jsPDF({
-    orientation: firstW > firstH ? 'landscape' : 'portrait',
-    unit: 'mm',
-    format: [firstW * ptToMM, firstH * ptToMM],
-  });
+export async function exportPagesToPDF(canvases, pageWidths, pageHeights, textContents, viewports, onProgress) {
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   for (let i = 0; i < canvases.length; i++) {
-    if (i > 0) {
-      const w = pageWidths[i];
-      const h = pageHeights[i];
-      pdf.addPage([w * ptToMM, h * ptToMM], w > h ? 'landscape' : 'portrait');
-    }
+    const w = pageWidths[i];
+    const h = pageHeights[i];
+    const page = pdfDoc.addPage([w, h]);
 
-    const canvas = canvases[i];
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
-    const wMM = pageWidths[i] * ptToMM;
-    const hMM = pageHeights[i] * ptToMM;
-    pdf.addImage(imgData, 'JPEG', 0, 0, wMM, hMM);
+    // Draw the bionic canvas as page image
+    const blob = await new Promise((resolve) => canvases[i].toBlob(resolve, 'image/jpeg', 0.92));
+    const imgBytes = await blob.arrayBuffer();
+    const img = await pdfDoc.embedJpg(imgBytes);
+    page.drawImage(img, { x: 0, y: 0, width: w, height: h });
+
+    // Overlay invisible text layer for selection/copy
+    const textContent = textContents[i];
+    const vp = viewports[i];
+    if (textContent?.items) {
+      const vpTransform = vp.transform;
+      for (const item of textContent.items) {
+        if (!item.str || item.str.trim() === '') continue;
+
+        const tx = [
+          vpTransform[0] * item.transform[0] + vpTransform[2] * item.transform[1],
+          vpTransform[1] * item.transform[0] + vpTransform[3] * item.transform[1],
+          vpTransform[0] * item.transform[2] + vpTransform[2] * item.transform[3],
+          vpTransform[1] * item.transform[2] + vpTransform[3] * item.transform[3],
+          vpTransform[0] * item.transform[4] + vpTransform[2] * item.transform[5] + vpTransform[4],
+          vpTransform[1] * item.transform[4] + vpTransform[3] * item.transform[5] + vpTransform[5],
+        ];
+
+        const fontSize = Math.max(1, Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]));
+        const canvasX = tx[4];
+        const canvasY = tx[5];
+
+        // Convert canvas coords to PDF coords (flip Y)
+        const pdfX = canvasX / vp.scale;
+        const pdfY = h - canvasY / vp.scale;
+
+        try {
+          page.drawText(item.str, {
+            x: pdfX,
+            y: pdfY,
+            size: fontSize / vp.scale,
+            font,
+            color: rgb(1, 1, 1), // white = invisible on white bg
+            opacity: 0, // fully transparent
+          });
+        } catch {
+          // Skip characters not in Helvetica (e.g. CJK)
+        }
+      }
+    }
 
     if (onProgress) onProgress(i + 1, canvases.length);
   }
 
-  pdf.save('bionic-reading.pdf');
+  const pdfBytes = await pdfDoc.save();
+  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bionic-reading.pdf';
+  a.click();
+  URL.revokeObjectURL(url);
 }
